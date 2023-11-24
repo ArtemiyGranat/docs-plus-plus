@@ -20,7 +20,6 @@ Engine::Engine(const std::string &index,
       Lucene::FSDirectory::open(Lucene::StringUtils::toUnicode(index)), true);
   searcher = newLucene<Lucene::IndexSearcher>(reader);
   analyzer = newLucene<Lucene::SnowballAnalyzer>(version, L"english");
-  analyzer = newLucene<Lucene::StandardAnalyzer>(version);
   parser = newLucene<Lucene::MultiFieldQueryParser>(version, fields, analyzer);
 }
 
@@ -32,6 +31,7 @@ void Engine::run() {
       std::wstring line;
 
       std::wcout << "Enter query: ";
+      // TODO: Change wcin to ??? because spaces doesnt work
       std::wcin >> line;
 
       boost::trim(line);
@@ -53,7 +53,7 @@ void Engine::run() {
       }
     }
   } catch (Lucene::LuceneException &e) {
-    std::wcout << L"Lucene exception: " << e.getError() << L"\n";
+    std::wcerr << "Lucene exception: " << e.getError() << "\n";
     return;
   }
 }
@@ -62,7 +62,6 @@ static void displayResultInfo(int idx, Lucene::DocumentPtr doc) {
   Lucene::String title = doc->get(L"title");
 
   std::wcout << Lucene::StringUtils::toString(idx + 1) + L". " << title << '\n';
-  std::wcout << L"Description: " << doc->get(L"signature") << '\n';
 }
 
 static std::wstring collectMoreHint(size_t hitsSize, int32_t numTotalHits) {

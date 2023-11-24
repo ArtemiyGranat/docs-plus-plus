@@ -34,16 +34,15 @@ int main(int argc, char *argv[]) {
     try {
       indexFiles(argv);
     } catch (const std::runtime_error &e) {
-      std::cerr << e.what() << '\n';
+      std::wcerr << e.what() << '\n';
     }
     return 0;
   }
 
-
   std::string index = argv[1];
   // TODO: read fields from file?
   Lucene::Collection<Lucene::String> fields =
-      Lucene::newCollection<Lucene::String>(L"title", L"headers", L"signature",
+      Lucene::newCollection<Lucene::String>(L"title", L"headers",
                                             L"description");
 
   Engine engine(index, fields);
