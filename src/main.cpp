@@ -1,77 +1,51 @@
-#include <LuceneHeaders.h>
-#include <MiscUtils.h>
-#include <StringUtils.h>
+#include "Engine.h"
+#include "InMemoryIndex.h"
 
 #include <filesystem>
 #include <iostream>
+#include <sstream>
+#include <stdexcept>
 
-#include <nlohmann/json.hpp>
-
-using namespace Lucene;
-using json = nlohmann::json;
-
-DocumentPtr toDocument(const json &elem) {
-  DocumentPtr doc = newLucene<Document>();
-
-  doc->add(newLucene<Field>(L"title", StringUtils::toUnicode(elem["title"]), Field::STORE_YES,
-                            Field::INDEX_ANALYZED));
-  doc->add(newLucene<Field>(L"headers", StringUtils::toUnicode(elem["headers"]), Field::STORE_YES,
-                            Field::INDEX_NOT_ANALYZED));
-  doc->add(newLucene<Field>(L"signature", StringUtils::toUnicode(elem["signature"]), Field::STORE_YES,
-                            Field::INDEX_ANALYZED));
-  doc->add(newLucene<Field>(L"description", StringUtils::toUnicode(elem["description"]),
-                            Field::STORE_YES, Field::INDEX_ANALYZED));
-  doc->add(newLucene<Field>(L"example", StringUtils::toUnicode(elem["example"]),
-                            Field::STORE_YES, Field::INDEX_ANALYZED));
-
-  return doc;
-}
-
-void index(const IndexWriterPtr &writer, const std::string &sourceFile) {
-  std::ifstream src(sourceFile);
-  json data = json::parse(src);
-
-  for (const auto &doc : data) {
-    std::cout << "Indexing " << doc["title"] << '\n';
-    writer->addDocument(toDocument(doc));
-  }
-}
-
-int main(int argc, char *argv[]) {
-  if (argc != 3) {
-    std::cout << "Usage: " << argv[0] << " <source file> <index dir>\n";
-    return 1;
-  }
-
+void indexFiles(char *argv[]) {
   std::string sourceFile(argv[1]);
   std::string indexDir(argv[2]);
 
   if (!std::filesystem::exists(sourceFile)) {
-    std::cout << "Source file doesn't exist: " << sourceFile << "\n";
+    std::stringstream msg;
+    msg << "Source file doesn't exist: " << sourceFile;
+    throw std::runtime_error(msg.str());
   }
 
   if (!std::filesystem::is_directory(indexDir)) {
     if (!std::filesystem::create_directory(indexDir)) {
-      std::cout << "Unable to create directory: " << indexDir << "\n";
-      return 1;
+      std::stringstream msg;
+      msg << "Unable to create directory: " << indexDir;
+      throw std::runtime_error(msg.str());
     }
   }
 
-  try {
-    IndexWriterPtr writer = newLucene<IndexWriter>(
-        FSDirectory::open(StringUtils::toUnicode(indexDir)),
-        newLucene<StandardAnalyzer>(LuceneVersion::LUCENE_CURRENT), true,
-        IndexWriter::MaxFieldLengthLIMITED);
-    std::cout << "Indexing to directory: " << indexDir << '\n';
+  InMemoryIndex index(indexDir);
+  index.processJsonFile(sourceFile);
+}
 
-    index(writer, sourceFile);
-
-    writer->optimize();
-    writer->close();
-  } catch (LuceneException &e) {
-    std::cout << "Exception: " << e.what() << "\n";
-    return 1;
+int main(int argc, char *argv[]) {
+  // TODO: argv[0] --index <source> <index> or argv[0] <index> or usage message
+  if (argc == 3) {
+    try {
+      indexFiles(argv);
+    } catch (const std::runtime_error &e) {
+      std::cerr << e.what() << '\n';
+    }
+    return 0;
   }
 
-  return 0;
+
+  std::string index = argv[1];
+  // TODO: read fields from file?
+  Lucene::Collection<Lucene::String> fields =
+      Lucene::newCollection<Lucene::String>(L"title", L"headers", L"signature",
+                                            L"description");
+
+  Engine engine(index, fields);
+  engine.run();
 }
