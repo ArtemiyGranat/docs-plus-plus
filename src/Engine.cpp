@@ -8,6 +8,8 @@
 #include <StringUtils.h>
 #include <boost/algorithm/string.hpp>
 #include <iostream>
+#include <regex>
+#include <string>
 #include <string_view>
 
 using Lucene::newLucene;
@@ -25,22 +27,56 @@ Engine::Engine(const std::string &index,
 
 Engine::~Engine() { reader->close(); }
 
+void Engine::processQuery(std::string &query) {
+  std::string delimiters[] = {" ", "_", "::", "(", ")", "<", ">"};
+  std::string specialSymbols[] = {":",  "(", ")", "[", "]", "{", "}", "&&",
+                                  "||", "+", "-", "!", "^", "*", "?"};
+
+  for (const auto &delimiter : delimiters) {
+    size_t pos = query.find(delimiter);
+    while (pos != std::string::npos) {
+      if (pos == 0) {
+        pos = query.find(delimiter, pos + 1);
+        continue;
+      }
+      query.replace(pos, delimiter.length(), "~" + delimiter);
+      pos = query.find(delimiter, pos + 2);
+    }
+  }
+
+  for (const auto &symbol : specialSymbols) {
+    if (query == symbol || query == "~") {
+      std::cout << "Invalid query: " << query << '\n';
+      query = "";
+      return;
+    }
+    std::string pattern = "";
+    for (const auto &ch : symbol) {
+      pattern += std::string("\\") + ch;
+    }
+    query =
+        std::regex_replace(query, std::regex(std::string(pattern)), pattern);
+  }
+  boost::trim(query);
+  query += '~';
+}
+
 void Engine::run() {
   try {
     while (true) {
-      std::wstring line;
+      std::string line;
 
       std::wcout << "Enter query: ";
-      std::getline(std::wcin, line);
-      // Fuzzy search
-      line += L"~";
+      std::getline(std::cin, line);
 
-      boost::trim(line);
+      Engine::processQuery(line);
       if (line.empty()) {
-        break;
+        continue;
       }
 
-      Lucene::QueryPtr query = parser->parse(line);
+      std::wstring unicodeQuery = Lucene::StringUtils::toUnicode(line);
+
+      Lucene::QueryPtr query = parser->parse(unicodeQuery);
 
       search(query, 10);
 
@@ -71,7 +107,7 @@ static std::wstring collectMoreHint(size_t hitsSize, int32_t numTotalHits) {
   std::wcout << "Collect more (y/n)?";
 
   std::wstring choice;
-  std::wcin >> choice;
+  std::getline(std::wcin, choice);
   boost::trim(choice);
 
   return choice;

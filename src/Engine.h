@@ -17,6 +17,7 @@ public:
   ~Engine();
   void run();
   void search(const Lucene::QueryPtr &query, int32_t hitsPerPage);
+  void processQuery(std::string &query);
 
 public:
   Engine(const Engine &) = delete;
