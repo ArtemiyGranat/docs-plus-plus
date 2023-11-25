@@ -12,6 +12,9 @@
 #include <string>
 #include <string_view>
 
+#include <fmt/color.h>
+#include <fmt/xchar.h>
+
 using Lucene::newLucene;
 
 Engine::Engine(const std::string &index,
@@ -46,7 +49,7 @@ void Engine::processQuery(std::string &query) {
 
   for (const auto &symbol : specialSymbols) {
     if (query == symbol || query == "~") {
-      std::cout << "Invalid query: " << query << '\n';
+      fmt::println("✖ Invalid query: {}", query);
       query = "";
       return;
     }
@@ -66,7 +69,7 @@ void Engine::run() {
     while (true) {
       std::string line;
 
-      std::wcout << "Enter query: ";
+      fmt::print(fmt::fg(fmt::terminal_color::blue), " Enter query ❯ ");
       std::getline(std::cin, line);
 
       Engine::processQuery(line);
@@ -81,7 +84,8 @@ void Engine::run() {
       search(query, 10);
 
       std::wstring choice;
-      std::wcout << "Do you want to make another query? (y/n): ";
+      fmt::print("Do you want to make another query? {} ❯ ",
+                 fmt::styled("(y/n)", fmt::fg(fmt::terminal_color::blue)));
       std::getline(std::wcin, choice);
 
       boost::trim(choice);
@@ -90,7 +94,9 @@ void Engine::run() {
       }
     }
   } catch (Lucene::LuceneException &e) {
-    std::wcerr << "Lucene exception: " << e.getError() << "\n";
+    fmt::println(stderr, L"{} Lucene exception: {}",
+                 fmt::styled(L"✗", fmt::fg(fmt::terminal_color::red)),
+                 e.getError());
     return;
   }
 }
@@ -98,13 +104,13 @@ void Engine::run() {
 static void displayResultInfo(int idx, Lucene::DocumentPtr doc) {
   Lucene::String title = doc->get(L"title");
 
-  std::wcout << Lucene::StringUtils::toString(idx + 1) + L". " << title << '\n';
+  fmt::println(L"{}. {}", idx + 1, title);
 }
 
 static std::wstring collectMoreHint(size_t hitsSize, int32_t numTotalHits) {
-  std::wcout << "Only results 1 - " << hitsSize << " of " << numTotalHits
-             << " total matching documents collected.\n";
-  std::wcout << "Collect more (y/n)?";
+  fmt::println("Only first {} matching docs collected.", hitsSize);
+  fmt::print("Collect more? {} ❯ ",
+             fmt::styled("(y/n)", fmt::fg(fmt::terminal_color::blue)));
 
   std::wstring choice;
   std::getline(std::wcin, choice);
@@ -115,14 +121,15 @@ static std::wstring collectMoreHint(size_t hitsSize, int32_t numTotalHits) {
 
 static std::wstring navigateHint(int32_t hitsPerPage, int32_t start,
                                  int32_t numTotalHits) {
-  std::wcout << "Press ";
+  fmt::print(fmt::fg(fmt::terminal_color::blue), "Press ");
   if (start - hitsPerPage >= 0) {
-    std::wcout << "(p)revious page, ";
+    fmt::print(fmt::fg(fmt::terminal_color::blue), "(p)revious page, ");
   }
   if (start + hitsPerPage < numTotalHits) {
-    std::wcout << "(n)ext page, ";
+    fmt::print(fmt::fg(fmt::terminal_color::blue), "(n)ext page, ");
   }
-  std::wcout << "(q)uit or enter number to jump to a page: ";
+  fmt::print(fmt::fg(fmt::terminal_color::blue),
+             "(q)uit or enter number to jump to a page ❯ ");
 
   std::wstring choice;
   std::getline(std::wcin, choice);
@@ -139,7 +146,12 @@ void Engine::search(const Lucene::QueryPtr &query, int32_t hitsPerPage) {
   auto hits = collector->topDocs()->scoreDocs;
 
   int32_t numTotalHits = collector->getTotalHits();
-  std::wcout << numTotalHits << " total matching documents\n";
+  if (numTotalHits > 0) {
+    fmt::print(fg(fmt::terminal_color::green), "✓ Found {} matches\n",
+             numTotalHits);
+  } else {
+    fmt::print(fmt::fg(fmt::terminal_color::yellow), "Hasn't found anything\n");
+  }
 
   int32_t start = 0;
   int32_t end = std::min(numTotalHits, hitsPerPage);
@@ -187,13 +199,16 @@ void Engine::search(const Lucene::QueryPtr &query, int32_t hitsPerPage) {
           int32_t page = 0;
           try {
             page = Lucene::StringUtils::toInt(choice);
-          } catch (Lucene::NumberFormatException &) {
+          } catch (Lucene::NumberFormatException &) { // TODO: catch it properly
+            quit = true;
+            break;
           }
           if ((page - 1) * hitsPerPage < numTotalHits) {
             start = std::max(0, (page - 1) * hitsPerPage);
             break;
           } else {
-            std::wcout << "No such page\n";
+            fmt::println("{} No such page",
+                         fmt::styled("✖", fmt::fg(fmt::terminal_color::red)));
           }
         }
       }

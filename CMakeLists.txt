@@ -19,4 +19,10 @@ FetchContent_Declare(json
 )
 FetchContent_MakeAvailable(json)
 
+FetchContent_Declare(fmt
+    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+    GIT_TAG f5e54359df4c26b6230fc61d38aa294581393084
+)
+FetchContent_MakeAvailable(fmt)
+
 add_subdirectory(src)

@@ -2,3 +2,4 @@ build/
 .cache/
 index/
 *.json
+.DS_Store

@@ -14,5 +14,6 @@ target_link_libraries(docs++
     lucene++::lucene++
     lucene++-contrib
     nlohmann_json::nlohmann_json
+    fmt::fmt
 )
 
