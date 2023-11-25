@@ -1,4 +1,6 @@
 #include "Engine.h"
+#include "FuzzyQuery.h"
+#include "LuceneTypes.h"
 
 #include <Constants.h>
 #include <FSDirectory.h>
@@ -31,8 +33,9 @@ void Engine::run() {
       std::wstring line;
 
       std::wcout << "Enter query: ";
-      // TODO: Change wcin to ??? because spaces doesnt work
-      std::wcin >> line;
+      std::getline(std::wcin, line);
+      // Fuzzy search
+      line += L"~";
 
       boost::trim(line);
       if (line.empty()) {
@@ -45,7 +48,7 @@ void Engine::run() {
 
       std::wstring choice;
       std::wcout << "Do you want to make another query? (y/n): ";
-      std::wcin >> choice;
+      std::getline(std::wcin, choice);
 
       boost::trim(choice);
       if (choice.starts_with('n')) {
@@ -88,20 +91,18 @@ static std::wstring navigateHint(int32_t hitsPerPage, int32_t start,
   std::wcout << "(q)uit or enter number to jump to a page: ";
 
   std::wstring choice;
-  std::wcin >> choice;
+  std::getline(std::wcin, choice);
   boost::trim(choice);
 
   return choice;
 }
 
 void Engine::search(const Lucene::QueryPtr &query, int32_t hitsPerPage) {
-  Lucene::TopScoreDocCollectorPtr collector =
-      Lucene::TopScoreDocCollector::create(5 * hitsPerPage, false);
+  auto collector = Lucene::TopScoreDocCollector::create(5 * hitsPerPage, false);
 
   searcher->search(query, collector);
 
-  Lucene::Collection<Lucene::ScoreDocPtr> hits =
-      collector->topDocs()->scoreDocs;
+  auto hits = collector->topDocs()->scoreDocs;
 
   int32_t numTotalHits = collector->getTotalHits();
   std::wcout << numTotalHits << " total matching documents\n";
