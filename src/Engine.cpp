@@ -1,6 +1,4 @@
 #include "Engine.h"
-#include "FuzzyQuery.h"
-#include "LuceneTypes.h"
 
 #include <Constants.h>
 #include <FSDirectory.h>

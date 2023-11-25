@@ -1,5 +1,7 @@
 #include "InMemoryIndex.h"
 
+#include "SynonymAnalyzer.h"
+
 #include <iostream>
 
 #include <LuceneHeaders.h>
@@ -14,10 +16,12 @@ using Lucene::newLucene;
 using Lucene::StringUtils;
 
 InMemoryIndex::InMemoryIndex(const std::string &indexDir) {
+  Lucene::MapStringString synonyms = Lucene::MapStringString::newInstance();
+  synonyms.put(L"unique", L"aboba"); // TODO: Add synonyms
+ 
   writer = newLucene<Lucene::IndexWriter>(
       Lucene::FSDirectory::open(Lucene::StringUtils::toUnicode(indexDir)),
-      newLucene<Lucene::SnowballAnalyzer>(Lucene::LuceneVersion::LUCENE_CURRENT,
-                                          L"english"),
+      newLucene<SynonymAnalyzer>(synonyms),
       true, Lucene::IndexWriter::MaxFieldLengthLIMITED);
 }
 

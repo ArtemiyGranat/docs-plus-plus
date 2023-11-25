@@ -4,6 +4,8 @@ set(SOURCES
     main.cpp
     InMemoryIndex.cpp
     Engine.cpp
+    SynonymAnalyzer.cpp
+    SynonymTokenizer.cpp
 )
 
 add_executable(docs++ ${SOURCES})
