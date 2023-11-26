@@ -1,6 +1,7 @@
 #include "InMemoryIndex.h"
 
 #include "SynonymAnalyzer.h"
+#include "fmt/core.h"
 
 #include <iostream>
 
@@ -17,7 +18,7 @@ using Lucene::StringUtils;
 
 InMemoryIndex::InMemoryIndex(const std::string &indexDir) {
   Lucene::MapStringString synonyms = Lucene::MapStringString::newInstance();
-  synonyms.put(L"unique", L"aboba"); // TODO: Add synonyms
+  addSynonyms(synonyms, "synonyms.json");
  
   writer = newLucene<Lucene::IndexWriter>(
       Lucene::FSDirectory::open(Lucene::StringUtils::toUnicode(indexDir)),
@@ -46,7 +47,7 @@ void InMemoryIndex::processJsonFile(const std::string &filePath) {
                          Field::STORE_YES, Field::INDEX_ANALYZED);
     auto signature = newLucene<Field>(
         L"signature", StringUtils::toUnicode(elem["signature"]),
-        Field::STORE_YES, Field::INDEX_NOT_ANALYZED);
+        Field::STORE_YES, Field::INDEX_ANALYZED);
     auto description = newLucene<Field>(
         L"description", StringUtils::toUnicode(elem["description"]),
         Field::STORE_YES, Field::INDEX_ANALYZED);
@@ -54,9 +55,10 @@ void InMemoryIndex::processJsonFile(const std::string &filePath) {
         newLucene<Field>(L"example", StringUtils::toUnicode(elem["example"]),
                          Field::STORE_YES, Field::INDEX_NOT_ANALYZED);
 
-    title->setBoost(2.0f);
+    title->setBoost(1.2f);
     headers->setBoost(1.0f);
-    description->setBoost(1.5f);
+    signature->setBoost(1.5f);
+    description->setBoost(2.0f);
 
     doc->add(title);
     doc->add(headers);
@@ -69,4 +71,30 @@ void InMemoryIndex::processJsonFile(const std::string &filePath) {
 
   writer->optimize();
   writer->close();
+}
+
+void InMemoryIndex::addSynonyms(Lucene::MapStringString synonymsMap, const std::string &fileName) {
+    std::ifstream file(fileName);
+    if (file.is_open()) {
+        nlohmann::json data;
+        file >> data;
+
+        for (auto& [term, synonyms] : data.items()) {
+            std::string concatenatedSynonyms;
+            for (const auto& synonym : synonyms) {
+                concatenatedSynonyms += synonym.get<std::string>() + ",";
+            }
+            if (!concatenatedSynonyms.empty()) {
+                concatenatedSynonyms.pop_back();
+            }
+
+            fmt::print("{} {}\n", term, concatenatedSynonyms);
+            synonymsMap.put(Lucene::StringUtils::toUnicode(term), Lucene::StringUtils::toUnicode(concatenatedSynonyms));
+        }
+
+        file.close();
+    } else {
+        std::cerr << "Unable to open file: " << fileName << std::endl;
+    }
+
 }

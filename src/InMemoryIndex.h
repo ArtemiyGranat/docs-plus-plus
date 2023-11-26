@@ -6,6 +6,8 @@
 class InMemoryIndex {
 private:
   Lucene::IndexWriterPtr writer;
+  void addSynonyms(Lucene::MapStringString synonymsMap,
+                   const std::string &fileName);
 
 public:
   explicit InMemoryIndex(const std::string &indexDir);
