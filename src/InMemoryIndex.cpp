@@ -17,12 +17,9 @@ using Lucene::newLucene;
 using Lucene::StringUtils;
 
 InMemoryIndex::InMemoryIndex(const std::string &indexDir) {
-  Lucene::MapStringString synonyms = Lucene::MapStringString::newInstance();
-  addSynonyms(synonyms, "synonyms.json");
- 
   writer = newLucene<Lucene::IndexWriter>(
       Lucene::FSDirectory::open(Lucene::StringUtils::toUnicode(indexDir)),
-      newLucene<SynonymAnalyzer>(synonyms),
+      newLucene<Lucene::SnowballAnalyzer>(Lucene::LuceneVersion::LUCENE_CURRENT, L"english"),
       true, Lucene::IndexWriter::MaxFieldLengthLIMITED);
 }
 
@@ -36,7 +33,7 @@ void InMemoryIndex::processJsonFile(const std::string &filePath) {
   nlohmann::json data = nlohmann::json::parse(src);
 
   for (const auto &elem : data) {
-    std::cout << "Indexing " << elem["title"] << '\n';
+    std::cout << elem["title"] << '\n';
     Lucene::DocumentPtr doc = newLucene<Lucene::Document>();
 
     auto title =
@@ -47,7 +44,7 @@ void InMemoryIndex::processJsonFile(const std::string &filePath) {
                          Field::STORE_YES, Field::INDEX_ANALYZED);
     auto signature = newLucene<Field>(
         L"signature", StringUtils::toUnicode(elem["signature"]),
-        Field::STORE_YES, Field::INDEX_ANALYZED);
+        Field::STORE_YES, Field::INDEX_NOT_ANALYZED);
     auto description = newLucene<Field>(
         L"description", StringUtils::toUnicode(elem["description"]),
         Field::STORE_YES, Field::INDEX_ANALYZED);
@@ -55,10 +52,10 @@ void InMemoryIndex::processJsonFile(const std::string &filePath) {
         newLucene<Field>(L"example", StringUtils::toUnicode(elem["example"]),
                          Field::STORE_YES, Field::INDEX_NOT_ANALYZED);
 
-    title->setBoost(1.2f);
+    title->setBoost(2.0f);
     headers->setBoost(1.0f);
-    signature->setBoost(1.5f);
-    description->setBoost(2.0f);
+    signature->setBoost(0.9f);
+    description->setBoost(1.5f);
 
     doc->add(title);
     doc->add(headers);
@@ -88,7 +85,7 @@ void InMemoryIndex::addSynonyms(Lucene::MapStringString synonymsMap, const std::
                 concatenatedSynonyms.pop_back();
             }
 
-            fmt::print("{} {}\n", term, concatenatedSynonyms);
+            // fmt::print("{} {}\n", term, concatenatedSynonyms);
             synonymsMap.put(Lucene::StringUtils::toUnicode(term), Lucene::StringUtils::toUnicode(concatenatedSynonyms));
         }
 

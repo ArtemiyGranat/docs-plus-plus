@@ -1,4 +1,7 @@
-#include "Engine.h"
+#include <iostream>
+#include <regex>
+#include <string>
+#include <string_view>
 
 #include <Constants.h>
 #include <FSDirectory.h>
@@ -6,14 +9,16 @@
 #include <QueryParser.h>
 #include <SnowballAnalyzer.h>
 #include <StringUtils.h>
+
 #include <boost/algorithm/string.hpp>
-#include <iostream>
-#include <regex>
-#include <string>
-#include <string_view>
 
 #include <fmt/color.h>
+#include <fmt/ranges.h>
 #include <fmt/xchar.h>
+
+#include <nlohmann/json.hpp>
+
+#include "Engine.h"
 
 using Lucene::newLucene;
 
@@ -26,26 +31,32 @@ Engine::Engine(const std::string &index,
   searcher = newLucene<Lucene::IndexSearcher>(reader);
   analyzer = newLucene<Lucene::SnowballAnalyzer>(version, L"english");
   parser = newLucene<Lucene::MultiFieldQueryParser>(version, fields, analyzer);
+  addSynonyms("synonyms.json");
+}
+
+void Engine::addSynonyms(std::string_view fileName) {
+  std::ifstream file(fileName);
+  if (file.is_open()) {
+    nlohmann::json data;
+    file >> data;
+
+    for (auto &[term, synonyms] : data.items()) {
+      synonymsMap[term].insert(synonymsMap[term].end(), synonyms.begin(),
+                               synonyms.end());
+    }
+
+    file.close();
+  } else {
+    std::cerr << "Unable to open file: " << fileName << std::endl;
+  }
 }
 
 Engine::~Engine() { reader->close(); }
 
 void Engine::processQuery(std::string &query) {
   std::string delimiters[] = {" ", "_", "::", "(", ")", "<", ">"};
-  std::string specialSymbols[] = {":",  "(", ")", "[", "]", "{", "}", "&&",
-                                  "||", "+", "-", "!", "^", "*", "?"};
-
-  for (const auto &delimiter : delimiters) {
-    size_t pos = query.find(delimiter);
-    while (pos != std::string::npos) {
-      if (pos == 0) {
-        pos = query.find(delimiter, pos + 1);
-        continue;
-      }
-      query.replace(pos, delimiter.length(), "~" + delimiter);
-      pos = query.find(delimiter, pos + 2);
-    }
-  }
+  std::string specialSymbols[] = {":",  "(", ")", "[", "]", "{", "}",
+                                  "||", "+", "-", "!", "*", "?"};
 
   for (const auto &symbol : specialSymbols) {
     if (query == symbol || query == "~") {
@@ -61,7 +72,6 @@ void Engine::processQuery(std::string &query) {
         std::regex_replace(query, std::regex(std::string(pattern)), pattern);
   }
   boost::trim(query);
-  query += '~';
 }
 
 void Engine::run() {
@@ -77,6 +87,15 @@ void Engine::run() {
         continue;
       }
 
+      std::istringstream lineStream(line);
+      std::istream_iterator<std::string> begin(lineStream), end;
+      while (begin != end) {
+        for (const auto &synonym : synonymsMap[*begin]) {
+          line += " " + synonym + "^0.05";
+        }
+        ++begin;
+      }
+      
       std::wstring unicodeQuery = Lucene::StringUtils::toUnicode(line);
 
       Lucene::QueryPtr query = parser->parse(unicodeQuery);
@@ -101,10 +120,8 @@ void Engine::run() {
   }
 }
 
-static void displayResultInfo(int idx, Lucene::DocumentPtr doc) {
-  Lucene::String title = doc->get(L"title");
-
-  fmt::println(L"{}. {}", idx + 1, title);
+static inline void displayResultInfo(int idx, Lucene::DocumentPtr doc) {
+  fmt::println(L"{}. {}", idx + 1, doc->get(L"title"));
 }
 
 static std::wstring collectMoreHint(size_t hitsSize, int32_t numTotalHits) {
@@ -148,7 +165,7 @@ void Engine::search(const Lucene::QueryPtr &query, int32_t hitsPerPage) {
   int32_t numTotalHits = collector->getTotalHits();
   if (numTotalHits > 0) {
     fmt::print(fg(fmt::terminal_color::green), "✓ Found {} matches\n",
-             numTotalHits);
+               numTotalHits);
   } else {
     fmt::print(fmt::fg(fmt::terminal_color::yellow), "Hasn't found anything\n");
   }

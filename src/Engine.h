@@ -10,7 +10,9 @@ private:
   Lucene::SearcherPtr searcher;
   Lucene::AnalyzerPtr analyzer;
   Lucene::MultiFieldQueryParserPtr parser;
+  std::unordered_map<std::string, std::vector<std::string>> synonymsMap;
 
+  void addSynonyms(std::string_view fileName);
 public:
   explicit Engine(const std::string &index,
                   Lucene::Collection<Lucene::String> fields);
