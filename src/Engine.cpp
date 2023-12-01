@@ -91,7 +91,7 @@ void Engine::run() {
       std::istream_iterator<std::string> begin(lineStream), end;
       while (begin != end) {
         for (const auto &synonym : synonymsMap[*begin]) {
-          line += " " + synonym + "^0.05";
+          line += " " + synonym;
         }
         ++begin;
       }

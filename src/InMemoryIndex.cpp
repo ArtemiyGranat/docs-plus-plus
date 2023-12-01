@@ -1,8 +1,3 @@
-#include "InMemoryIndex.h"
-
-#include "SynonymAnalyzer.h"
-#include "fmt/core.h"
-
 #include <iostream>
 
 #include <LuceneHeaders.h>
@@ -10,7 +5,11 @@
 #include <SnowballAnalyzer.h>
 #include <StringUtils.h>
 
+#include <fmt/core.h>
+
 #include <nlohmann/json.hpp>
+
+#include "InMemoryIndex.h"
 
 using Lucene::Field;
 using Lucene::newLucene;
